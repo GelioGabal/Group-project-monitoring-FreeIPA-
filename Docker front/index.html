@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeIPA API Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --light: #ecf0f1;
+            --dark: #34495e;
+            --gray: #95a5a6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a3a, #2c3e50);
+            color: var(--light);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .logo i {
+            font-size: 2.5rem;
+            color: var(--secondary);
+        }
+        
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(46, 204, 113, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--success);
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (max-width: 1100px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-header h2 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        }
+        
+        .card-header i {
+            color: var(--secondary);
+        }
+        
+        .btn {
+            padding: 0.6rem 1.2rem;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: var(--accent);
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .api-endpoint {
+            display: flex;
+            margin-bottom: 1rem;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .method {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            font-weight: bold;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .endpoint {
+            padding: 0.5rem 1rem;
+            flex-grow: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .response {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .exception {
+            border-left: 4px solid var(--accent);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (max-width: 900px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 500px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+            color: var(--secondary);
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 1rem;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--secondary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .live-data {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--success);
+            font-size: 0.9rem;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+            color: var(--gray);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse-alert {
+            animation: pulseAlert 2s infinite;
+        }
+        
+        @keyframes pulseAlert {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <h1>FreeIPA API Dashboard</h1>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>Сервис активен</span>
+            </div>
+        </header>
+        
+        <div class="stats-grid">
+            <div class="stat-card fade-in">
+                <div class="stat-label">Пользователи</div>
+                <div class="stat-value" id="userCount">0</div>
+                <div class="stat-label">Активные сессии: <span id="activeSessions">0</span></div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Группы</div>
+                <div class="stat-value" id="groupCount">0</div>
+                <div class="stat-label">Привилегированные: <span id="privilegedGroups">0</span></div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Хосты</div>
+                <div class="stat-value" id="hostCount">0</div>
+                <div class="stat-label">В сети: <span id="onlineHosts">0</span></div>
+            </div>
+            <div class="stat-card fade-in">
+                <div class="stat-label">Сервисы</div>
+                <div class="stat-value" id="serviceCount">0</div>
+                <div class="stat-label">Активные: <span id="activeServices">0</span></div>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2><i class="fas fa-users"></i> Пользователи</h2>
+                    <button class="btn" id="fetchUsers">
+                        <i class="fas fa-sync-alt"></i> Обновить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">GET</div>
+                    <div class="endpoint">/api/v1/user</div>
+                </div>
+                <div class="response" id="usersResponse">
+                    Нажмите "Обновить" для выполнения запроса
+                </div>
+            </div>
+            
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2><i class="fas fa-layer-group"></i> Группы</h2>
+                    <button class="btn" id="fetchGroups">
+                        <i class="fas fa-sync-alt"></i> Обновить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">GET</div>
+                    <div class="endpoint">/api/v1/group</div>
+                </div>
+                <div class="response" id="groupsResponse">
+                    Нажмите "Обновить" для выполнения запроса
+                </div>
+            </div>
+            
+            <div class="card fade-in exception">
+                <div class="card-header">
+                    <h2><i class="fas fa-key"></i> Изменение пароля</h2>
+                    <button class="btn btn-danger" id="changePassword">
+                        <i class="fas fa-exclamation-triangle"></i> Выполнить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">POST</div>
+                    <div class="endpoint">/api/v1/user/{uid}/password</div>
+                </div>
+                <p><strong>Исключение:</strong> Операция изменения пароля недоступна через веб-интерфейс</p>
+                <div class="response" id="passwordResponse">
+                    Нажмите "Выполнить" для попытки изменения пароля
+                </div>
+            </div>
+            
+            <div class="card fade-in exception">
+                <div class="card-header">
+                    <h2><i class="fas fa-user-plus"></i> Добавление пользователя</h2>
+                    <button class="btn btn-danger" id="addUser">
+                        <i class="fas fa-exclamation-triangle"></i> Выполнить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">POST</div>
+                    <div class="endpoint">/api/v1/user</div>
+                </div>
+                <p><strong>Исключение:</strong> Создание новых пользователей недоступно через веб-интерфейс</p>
+                <div class="response" id="addUserResponse">
+                    Нажмите "Выполнить" для попытки создания пользователя
+                </div>
+            </div>
+            
+            <div class="card fade-in exception">
+                <div class="card-header">
+                    <h2><i class="fas fa-user-minus"></i> Удаление пользователя</h2>
+                    <button class="btn btn-danger" id="deleteUser">
+                        <i class="fas fa-exclamation-triangle"></i> Выполнить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">DELETE</div>
+                    <div class="endpoint">/api/v1/user/{uid}</div>
+                </div>
+                <p><strong>Исключение:</strong> Удаление пользователей недоступно через веб-интерфейс</p>
+                <div class="response" id="deleteUserResponse">
+                    Нажмите "Выполнить" для попытки удаления пользователя
+                </div>
+            </div>
+            
+            <div class="card fade-in exception">
+                <div class="card-header">
+                    <h2><i class="fas fa-user-lock"></i> Изменение политики доступа</h2>
+                    <button class="btn btn-danger" id="changePolicy">
+                        <i class="fas fa-exclamation-triangle"></i> Выполнить
+                    </button>
+                </div>
+                <div class="api-endpoint">
+                    <div class="method">PUT</div>
+                    <div class="endpoint">/api/v1/policy/{policy_name}</div>
+                </div>
+                <p><strong>Исключение:</strong> Изменение политик доступа недоступно через веб-интерфейс</p>
+                <div class="response" id="policyResponse">
+                    Нажмите "Выполнить" для попытки изменения политики
+                </div>
+            </div>
+        </div>
+        
+        <div class="card fade-in">
+            <div class="card-header">
+                <h2><i class="fas fa-chart-line"></i> Аналитика в реальном времени</h2>
+                <div class="live-data">
+                    <i class="fas fa-circle"></i> Live Data
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="analyticsChart"></canvas>
+            </div>
+        </div>
+        
+        <footer>
+            <p>FreeIPA API Dashboard &copy; 2025 | Мониторинг в реальном времени</p>
+        </footer>
+    </div>
+
+    <script>
+        // Инициализация статистики
+        let userCount = 142;
+        let groupCount = 28;
+        let hostCount = 64;
+        let serviceCount = 19;
+        
+        // Обновление статистики
+        function updateStats() {
+            document.getElementById('userCount').textContent = userCount;
+            document.getElementById('groupCount').textContent = groupCount;
+            document.getElementById('hostCount').textContent = hostCount;
+            document.getElementById('serviceCount').textContent = serviceCount;
+            
+            // Случайные значения для дополнительной статистики
+            document.getElementById('activeSessions').textContent = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('privilegedGroups').textContent = Math.floor(Math.random() * 5) + 3;
+            document.getElementById('onlineHosts').textContent = Math.floor(Math.random() * 40) + 20;
+            document.getElementById('activeServices').textContent = Math.floor(Math.random() * 15) + 5;
+            
+            // Небольшие случайные изменения основных показателей
+            userCount += Math.floor(Math.random() * 3) - 1;
+            groupCount += Math.floor(Math.random() * 2);
+            hostCount += Math.floor(Math.random() * 3) - 1;
+            serviceCount += Math.floor(Math.random() * 2);
+            
+            // Гарантия минимальных значений
+            userCount = Math.max(userCount, 135);
+            groupCount = Math.max(groupCount, 25);
+            hostCount = Math.max(hostCount, 60);
+            serviceCount = Math.max(serviceCount, 15);
+        }
+        
+        // Инициализация графика
+        let analyticsChart;
+        function initChart() {
+            const ctx = document.getElementById('analyticsChart').getContext('2d');
+            analyticsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['10:00', '10:15', '10:30', '10:45', '11:00', '11:15', '11:30', '11:45', '12:00'],
+                    datasets: [
+                        {
+                            label: 'Активные пользователи',
+                            data: [32, 45, 28, 51, 42, 65, 59, 50, 47],
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'API запросы',
+                            data: [120, 145, 132, 165, 142, 195, 189, 170, 157],
+                            borderColor: '#2ecc71',
+                            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#ecf0f1'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#bdc3c7'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#bdc3c7'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Обновление графика
+        function updateChart() {
+            if (analyticsChart) {
+                // Добавляем новую точку данных и удаляем первую
+                const newTime = new Date();
+                const timeLabel = newTime.getHours() + ':' + (newTime.getMinutes() < 10 ? '0' : '') + newTime.getMinutes();
+                
+                analyticsChart.data.labels.push(timeLabel);
+                analyticsChart.data.labels.shift();
+                
+                // Обновляем данные
+                analyticsChart.data.datasets[0].data.push(Math.floor(Math.random() * 40) + 30);
+                analyticsChart.data.datasets[0].data.shift();
+                
+                analyticsChart.data.datasets[1].data.push(Math.floor(Math.random() * 100) + 100);
+                analyticsChart.data.datasets[1].data.shift();
+                
+                analyticsChart.update();
+            }
+        }
+        
+        // Функция для генерации случайных данных пользователей
+        function generateUsers() {
+            const users = [];
+            const names = ['ivanov', 'petrov', 'sidorov', 'smirnov', 'kuznetsov', 'popov', 'vasiliev', 'sokolov'];
+            
+            for (let i = 0; i < 5; i++) {
+                const name = names[Math.floor(Math.random() * names.length)];
+                users.push({
+                    uid: name + i,
+                    cn: `${name.charAt(0).toUpperCase() + name.slice(1)} User${i}`,
+                    mail: `${name}${i}@example.com`,
+                    uidNumber: 1000 + i,
+                    gidNumber: 1000 + i,
+                    loginShell: '/bin/bash',
+                    homeDirectory: `/home/${name}${i}`
+                });
+            }
+            
+            return users;
+        }
+        
+        // Функция для генерации случайных данных групп
+        function generateGroups() {
+            const groups = [];
+            const groupNames = ['admins', 'developers', 'users', 'managers', 'support'];
+            
+            for (let i = 0; i < 5; i++) {
+                groups.push({
+                    cn: groupNames[i],
+                    gidNumber: 2000 + i,
+                    description: `Группа ${groupNames[i]}`
+                });
+            }
+            
+            return groups;
+        }
+        
+        // Функция для форматирования JSON с отступами
+        function formatJSON(obj) {
+            return JSON.stringify(obj, null, 2);
+        }
+        
+        // Обработчики событий для кнопок
+        document.getElementById('fetchUsers').addEventListener('click', function() {
+            const responseElement = document.getElementById('usersResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Загрузка данных...';
+            
+            setTimeout(() => {
+                const users = generateUsers();
+                responseElement.innerHTML = formatJSON({
+                    status: 'success',
+                    result: users,
+                    count: users.length,
+                    timestamp: new Date().toISOString()
+                });
+            }, 1000);
+        });
+        
+        document.getElementById('fetchGroups').addEventListener('click', function() {
+            const responseElement = document.getElementById('groupsResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Загрузка данных...';
+            
+            setTimeout(() => {
+                const groups = generateGroups();
+                responseElement.innerHTML = formatJSON({
+                    status: 'success',
+                    result: groups,
+                    count: groups.length,
+                    timestamp: new Date().toISOString()
+                });
+            }, 1000);
+        });
+        
+        // Обработчики для исключений
+        document.getElementById('changePassword').addEventListener('click', function() {
+            const responseElement = document.getElementById('passwordResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Выполнение операции...';
+            
+            setTimeout(() => {
+                responseElement.innerHTML = formatJSON({
+                    status: 'error',
+                    code: 403,
+                    message: 'Операция изменения пароля недоступна через веб-интерфейс. Используйте CLI или другие разрешенные методы.',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Анимация предупреждения
+                this.classList.add('pulse-alert');
+                setTimeout(() => {
+                    this.classList.remove('pulse-alert');
+                }, 2000);
+            }, 1500);
+        });
+        
+        document.getElementById('addUser').addEventListener('click', function() {
+            const responseElement = document.getElementById('addUserResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Выполнение операции...';
+            
+            setTimeout(() => {
+                responseElement.innerHTML = formatJSON({
+                    status: 'error',
+                    code: 403,
+                    message: 'Создание новых пользователей недоступно через веб-интерфейс. Обратитесь к администратору.',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Анимация предупреждения
+                this.classList.add('pulse-alert');
+                setTimeout(() => {
+                    this.classList.remove('pulse-alert');
+                }, 2000);
+            }, 1500);
+        });
+        
+        document.getElementById('deleteUser').addEventListener('click', function() {
+            const responseElement = document.getElementById('deleteUserResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Выполнение операции...';
+            
+            setTimeout(() => {
+                responseElement.innerHTML = formatJSON({
+                    status: 'error',
+                    code: 403,
+                    message: 'Удаление пользователей недоступно через веб-интерфейс. Обратитесь к администратору.',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Анимация предупреждения
+                this.classList.add('pulse-alert');
+                setTimeout(() => {
+                    this.classList.remove('pulse-alert');
+                }, 2000);
+            }, 1500);
+        });
+        
+        document.getElementById('changePolicy').addEventListener('click', function() {
+            const responseElement = document.getElementById('policyResponse');
+            responseElement.innerHTML = '<span class="loading"></span> Выполнение операции...';
+            
+            setTimeout(() => {
+                responseElement.innerHTML = formatJSON({
+                    status: 'error',
+                    code: 403,
+                    message: 'Изменение политик доступа недоступно через веб-интерфейс. Обратитесь к администратору.',
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Анимация предупреждения
+                this.classList.add('pulse-alert');
+                setTimeout(() => {
+                    this.classList.remove('pulse-alert');
+                }, 2000);
+            }, 1500);
+        });
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            initChart();
+            
+            // Обновление статистики каждые 5 секунд
+            setInterval(updateStats, 5000);
+            
+            // Обновление графика каждые 15 секунд
+            setInterval(updateChart, 15000);
+            
+            // Первоначальная загрузка данных
+            document.getElementById('fetchUsers').click();
+            document.getElementById('fetchGroups').click();
+        });
+    </script>
+</body>
+</html>
